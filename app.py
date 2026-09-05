@@ -34,11 +34,14 @@ def dashboard():
     try:
         cursor = get_cursor(dictionary=True)
 
-        cursor.execute("SELECT COUNT(*) AS total FROM fish_data")
+        cursor.execute("""
+            SELECT COUNT(*) AS total
+            FROM fish_data
+        """)
         total_records = cursor.fetchone()["total"]
 
         cursor.execute("""
-            SELECT COUNT(DISTINCT species) AS total_species
+            SELECT COUNT(DISTINCT fish_name) AS total_species
             FROM fish_data
         """)
         total_species = cursor.fetchone()["total_species"]
@@ -87,14 +90,14 @@ def recommend():
 
         if request.method == "POST":
             data = request.get_json() or {}
-            species = data.get("species")
+            fish_name = data.get("fish_name") or data.get("species")
 
-            if species:
+            if fish_name:
                 cursor.execute("""
                     SELECT *
                     FROM fish_data
-                    WHERE species = %s
-                """, (species,))
+                    WHERE fish_name = %s
+                """, (fish_name,))
             else:
                 cursor.execute("""
                     SELECT *
@@ -103,14 +106,17 @@ def recommend():
                 """)
 
         else:
-            species = request.args.get("species")
+            fish_name = (
+                request.args.get("fish_name")
+                or request.args.get("species")
+            )
 
-            if species:
+            if fish_name:
                 cursor.execute("""
                     SELECT *
                     FROM fish_data
-                    WHERE species = %s
-                """, (species,))
+                    WHERE fish_name = %s
+                """, (fish_name,))
             else:
                 cursor.execute("""
                     SELECT *
@@ -145,8 +151,17 @@ def trend():
         cursor = get_cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT *
+            SELECT
+                id,
+                fish_name,
+                location,
+                latitude,
+                longitude,
+                depth,
+                temperature,
+                date
             FROM fish_data
+            ORDER BY date
         """)
 
         data = cursor.fetchall()
@@ -170,8 +185,6 @@ def trend():
 
 @app.route("/analyze-fish", methods=["POST"])
 def analyze_fish():
-    cursor = None
-
     try:
         if "file" not in request.files:
             return jsonify({
@@ -187,7 +200,6 @@ def analyze_fish():
 
         df = pd.read_csv(file)
 
-        # Replace NaN values with None so Flask can return JSON
         df = df.where(pd.notnull(df), None)
 
         return jsonify({
@@ -201,10 +213,6 @@ def analyze_fish():
         return jsonify({
             "error": str(e)
         }), 500
-
-    finally:
-        if cursor:
-            cursor.close()
 
 
 # --------------------------------------------------
@@ -228,7 +236,7 @@ def search_fish():
         cursor.execute("""
             SELECT *
             FROM fish_data
-            WHERE species LIKE %s
+            WHERE fish_name LIKE %s
         """, (f"%{fish_name}%",))
 
         results = cursor.fetchall()
@@ -308,7 +316,7 @@ def search_data():
             cursor.execute("""
                 SELECT *
                 FROM fish_data
-                WHERE species LIKE %s
+                WHERE fish_name LIKE %s
                    OR location LIKE %s
             """, (
                 f"%{search}%",
