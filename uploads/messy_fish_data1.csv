@@ -1,0 +1,101 @@
+Fish Name,Latitude,Longitude,Temperature,Depth,Distance(km)
+Cod,NA,78.6242,,,3.24
+Mackerel,NA,79.0445 ,,?,NaN
+Anchovy,NA,77.8303,25.6,?,13.95
+Shark,9.9707,79.0676 ,30.7,397,NaN
+Grouper,9.389,,27.8,319,61.51
+Mackerel,9.5448,null,,,NaN
+Salmon,NA,null,28.0,?,NaN
+Shark, 10.6747 ,78.2076 ,unknown,142,31.79
+Anchovy,,78.0141 ,,212,50.93
+Shark,,78.4 ,24.6,,
+Mackerel, 10.2666 ,79.3953,31.6,63,60.56
+Shark, 10.5904 ,,30.5,?,NaN
+Sardine,,78.5254 ,,,52.56
+Grouper,NA,79.6011,unknown,?,NaN
+Cod, 10.6775 ,null,29.7,?,NaN
+Salmon,,null,unknown,?,6.27
+Salmon,,79.1605,,?,
+Cod,10.6405,79.2373 ,unknown,120,47.95
+Tuna, 10.2332 ,null,28.3,386,NaN
+Snapper,9.3178,null,unknown,?,16.68
+Sardine,NA,null,25.2,,NaN
+Grouper,,null,unknown,?,
+Snapper,NA,77.6763 ,unknown,395,12.52
+Barracuda,NA,79.1572,26.1,164,
+Snapper,,null,25.1,494,22.13
+Shark,10.351,,29.7,290,
+Mackerel,,,,418,NaN
+Mackerel,NA,78.3614,unknown,,NaN
+Salmon,NA,null,unknown,,NaN
+Mackerel,,79.5887 ,,,NaN
+Salmon, 9.9258 ,null,31.3,165,NaN
+Sardine,NA,77.927 ,,,
+Barracuda,,77.8851 ,unknown,304,26.37
+Barracuda,10.2807,77.9567 ,,,69.37
+Barracuda,,null,unknown,?,
+Anchovy,,null,unknown,,
+Salmon,9.3177,null,,?,43.3
+Tuna,10.6934,,29.5,?,NaN
+Barracuda,,null,,,NaN
+Grouper, 10.4445 ,78.8243 ,24.5,,NaN
+Sardine,NA,77.8383 ,30.0,125,NaN
+Shark,9.6505,78.5531,unknown,249,
+Sardine,9.4217,,25.1,495,
+Mackerel,10.8982,null,unknown,,NaN
+Grouper,,null,27.3,?,61.34
+Shark,,79.2803,30.0,,NaN
+Anchovy,,77.6824,unknown,,14.83
+Snapper,10.0615,null,,491,19.4
+Sardine,,,unknown,?,9.1
+Shark,NA,,27.4,416,NaN
+Snapper,,79.5171 ,31.3,?,
+Grouper, 9.8865 ,77.9543 ,,?,NaN
+Cod,NA,null,unknown,279,NaN
+Cod,NA,null,24.2,?,NaN
+Mackerel, 10.5632 ,79.1802 ,unknown,?,NaN
+Cod,,null,27.8,166,
+Tuna,,79.4288 ,25.0,,63.65
+Barracuda, 10.5738 ,79.5289 ,,482,
+Barracuda,10.7108,79.0048 ,unknown,?,29.44
+Sardine,,,25.2,,
+Snapper,9.5719,,unknown,59,22.79
+Cod,,77.9426 ,,422,60.59
+Barracuda,NA,null,,?,NaN
+Anchovy,,78.0022,,?,
+Cod, 9.3027 ,78.1022,unknown,,NaN
+Anchovy,10.8542,77.849,,?,NaN
+Shark,9.7657,null,unknown,?,
+Sardine, 9.366 ,78.0217,30.6,,10.34
+Snapper,NA,79.6819 ,,?,NaN
+Shark,,null,unknown,?,66.43
+Snapper,9.3929,,unknown,,NaN
+Sardine, 9.4891 ,,,?,NaN
+Salmon,,null,unknown,223,NaN
+Mackerel,9.9033,78.0302 ,unknown,329,NaN
+Tuna,,78.1822,,,64.35
+Cod,NA,78.5542,unknown,?,
+Barracuda,NA,78.1396,30.0,?,63.2
+Anchovy, 10.099 ,77.5926 ,,266,
+Snapper,NA,78.1091 ,unknown,383,29.43
+Anchovy,10.7778,,26.9,47,31.12
+Tuna,,,29.5,,NaN
+Anchovy,NA,77.9454 ,31.7,,
+Salmon,,null,unknown,?,NaN
+Grouper, 9.8466 ,79.5286 ,30.1,264,2.91
+Tuna, 10.1577 ,null,,?,NaN
+Sardine,NA,null,unknown,,
+Salmon,,79.6912 ,29.5,,NaN
+Salmon,,79.1665 ,unknown,98,NaN
+Grouper, 10.2045 ,null,,,
+Sardine,10.2756,78.1378,31.2,?,NaN
+Tuna,,null,,86,NaN
+Snapper, 9.3866 ,79.4145 ,25.4,454,64.18
+Snapper,NA,,unknown,436,NaN
+Salmon,NA,null,,173,18.45
+Tuna, 10.3749 ,,,?,NaN
+Anchovy, 9.8886 ,,,?,
+Barracuda,NA,,unknown,?,
+Mackerel, 10.1847 ,78.7728 ,,,
+Anchovy,,null,unknown,485,21.19
+Sardine, 9.6166 ,78.5968,unknown,?,
