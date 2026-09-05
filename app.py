@@ -34,24 +34,50 @@ def dashboard():
     try:
         cursor = get_cursor(dictionary=True)
 
+        # Total records
         cursor.execute("""
             SELECT COUNT(*) AS total
             FROM fish_data
         """)
         total_records = cursor.fetchone()["total"]
 
+        # Total different fish
         cursor.execute("""
             SELECT COUNT(DISTINCT fish_name) AS total_species
             FROM fish_data
         """)
         total_species = cursor.fetchone()["total_species"]
 
+        # Total different locations
         cursor.execute("""
             SELECT COUNT(DISTINCT location) AS total_locations
             FROM fish_data
         """)
         total_locations = cursor.fetchone()["total_locations"]
 
+        # Fish distribution
+        cursor.execute("""
+            SELECT
+                fish_name,
+                COUNT(*) AS count
+            FROM fish_data
+            GROUP BY fish_name
+            ORDER BY count DESC
+        """)
+        species_data = cursor.fetchall()
+
+        # Location distribution
+        cursor.execute("""
+            SELECT
+                location,
+                COUNT(*) AS count
+            FROM fish_data
+            GROUP BY location
+            ORDER BY count DESC
+        """)
+        location_data = cursor.fetchall()
+
+        # All fish data
         cursor.execute("""
             SELECT *
             FROM fish_data
@@ -63,11 +89,14 @@ def dashboard():
             "total_records": total_records,
             "total_species": total_species,
             "total_locations": total_locations,
+            "species_data": species_data,
+            "location_data": location_data,
             "data": data
         })
 
     except Exception as e:
         print("Dashboard error:", e)
+
         return jsonify({
             "error": str(e)
         }), 500
