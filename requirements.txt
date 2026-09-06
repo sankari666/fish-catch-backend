@@ -5,3 +5,6 @@ pandas
 gunicorn
 python-dotenv
 openpyxl
+tensorflow
+numpy
+Pillow

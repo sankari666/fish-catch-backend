@@ -1,8 +1,10 @@
-
 import os
 import random
 import pandas as pd
+import numpy as np
+import tensorflow as tf
 
+from PIL import Image
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
@@ -16,7 +18,6 @@ from db import get_cursor, close_db
 app = Flask(__name__)
 CORS(app)
 
-# Close database connection automatically after each request
 app.teardown_appcontext(close_db)
 
 
@@ -32,11 +33,85 @@ os.makedirs(CLEAN_FOLDER, exist_ok=True)
 
 
 # ============================================================
+# AI MODEL
+# ============================================================
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "model",
+    "fish_model.h5"
+)
+
+LABELS_PATH = os.path.join(
+    BASE_DIR,
+    "model",
+    "labels.txt"
+)
+
+model = None
+class_names = []
+
+
+# Load trained model
+try:
+
+    if os.path.exists(MODEL_PATH):
+
+        model = tf.keras.models.load_model(
+            MODEL_PATH
+        )
+
+        print("Fish model loaded successfully")
+
+    else:
+
+        print(
+            "WARNING: Model not found:",
+            MODEL_PATH
+        )
+
+    if os.path.exists(LABELS_PATH):
+
+        with open(
+            LABELS_PATH,
+            "r"
+        ) as f:
+
+            class_names = [
+                line.strip()
+                for line in f
+                if line.strip()
+            ]
+
+        print(
+            "Fish labels loaded:",
+            class_names
+        )
+
+    else:
+
+        print(
+            "WARNING: labels.txt not found:",
+            LABELS_PATH
+        )
+
+except Exception as e:
+
+    print(
+        "ERROR loading fish model:",
+        str(e)
+    )
+
+
+# ============================================================
 # HOME / HEALTH CHECK
 # ============================================================
 
 @app.route("/")
 def home():
+
     return jsonify({
         "message": "Fish Catch Repository API is running",
         "status": "success"
@@ -50,11 +125,9 @@ def home():
 @app.route("/dashboard")
 def dashboard():
 
-    cursor = get_cursor(dictionary=True)
-
-    # --------------------------------------------------------
-    # Total records
-    # --------------------------------------------------------
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     cursor.execute("""
         SELECT COUNT(*) AS total_records
@@ -63,12 +136,9 @@ def dashboard():
 
     total = cursor.fetchone()
 
-    # --------------------------------------------------------
-    # Fish species counts
-    # --------------------------------------------------------
-
     cursor.execute("""
-        SELECT fish_name, COUNT(*) AS count
+        SELECT fish_name,
+               COUNT(*) AS count
         FROM fish_data
         GROUP BY fish_name
         ORDER BY count DESC
@@ -76,12 +146,9 @@ def dashboard():
 
     species = cursor.fetchall()
 
-    # --------------------------------------------------------
-    # Location counts
-    # --------------------------------------------------------
-
     cursor.execute("""
-        SELECT location, COUNT(*) AS count
+        SELECT location,
+               COUNT(*) AS count
         FROM fish_data
         GROUP BY location
         ORDER BY count DESC
@@ -90,9 +157,16 @@ def dashboard():
     locations = cursor.fetchall()
 
     return jsonify({
-        "total_records": total["total_records"],
-        "species_data": species,
-        "location_data": locations
+
+        "total_records":
+            total["total_records"],
+
+        "species_data":
+            species,
+
+        "location_data":
+            locations
+
     })
 
 
@@ -103,9 +177,14 @@ def dashboard():
 @app.route("/search")
 def search():
 
-    search_term = request.args.get("search", "").strip()
+    search_term = request.args.get(
+        "search",
+        ""
+    ).strip()
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     if search_term:
 
@@ -120,7 +199,10 @@ def search():
 
         cursor.execute(
             query,
-            (search_value, search_value)
+            (
+                search_value,
+                search_value
+            )
         )
 
     else:
@@ -142,14 +224,17 @@ def search():
 @app.route("/recommend")
 def recommend():
 
-    location = request.args.get("location")
-    month = request.args.get("month")
+    location = request.args.get(
+        "location"
+    )
 
-    cursor = get_cursor(dictionary=True)
+    month = request.args.get(
+        "month"
+    )
 
-    # --------------------------------------------------------
-    # If both filters are provided
-    # --------------------------------------------------------
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     if location and month:
 
@@ -165,12 +250,11 @@ def recommend():
 
         cursor.execute(
             query,
-            (location, month)
+            (
+                location,
+                month
+            )
         )
-
-    # --------------------------------------------------------
-    # Only location
-    # --------------------------------------------------------
 
     elif location:
 
@@ -188,10 +272,6 @@ def recommend():
             (location,)
         )
 
-    # --------------------------------------------------------
-    # Only month
-    # --------------------------------------------------------
-
     elif month:
 
         query = """
@@ -207,10 +287,6 @@ def recommend():
             query,
             (month,)
         )
-
-    # --------------------------------------------------------
-    # No filters
-    # --------------------------------------------------------
 
     else:
 
@@ -251,8 +327,11 @@ def trend():
     for row in rows:
 
         data.append({
+
             "year": row[0],
+
             "count": row[1]
+
         })
 
     return jsonify(data)
@@ -265,7 +344,9 @@ def trend():
 @app.route("/fish-data")
 def fish_data():
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     cursor.execute("""
         SELECT *
@@ -302,7 +383,9 @@ def locations():
         for row in rows
     ]
 
-    return jsonify(locations_list)
+    return jsonify(
+        locations_list
+    )
 
 
 # ============================================================
@@ -329,17 +412,21 @@ def species():
         for row in rows
     ]
 
-    return jsonify(species_list)
+    return jsonify(
+        species_list
+    )
 
 
 # ============================================================
-# DOWNLOAD FISH DATA AS CSV
+# DOWNLOAD CSV
 # ============================================================
 
 @app.route("/download/csv")
 def download_csv():
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     cursor.execute("""
         SELECT *
@@ -368,13 +455,15 @@ def download_csv():
 
 
 # ============================================================
-# DOWNLOAD FISH DATA AS EXCEL
+# DOWNLOAD EXCEL
 # ============================================================
 
 @app.route("/download/excel")
 def download_excel():
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     cursor.execute("""
         SELECT *
@@ -406,43 +495,69 @@ def download_excel():
 # ADMIN LOGIN
 # ============================================================
 
-@app.route("/login", methods=["POST"])
+@app.route(
+    "/login",
+    methods=["POST"]
+)
 def login():
 
     data = request.get_json()
 
-    username = data.get("username")
-    password = data.get("password")
+    username = data.get(
+        "username"
+    )
+
+    password = data.get(
+        "password"
+    )
 
     if not username or not password:
 
         return jsonify({
+
             "success": False,
-            "message": "Username and password are required"
+
+            "message":
+                "Username and password are required"
+
         }), 400
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     cursor.execute("""
         SELECT *
         FROM users
         WHERE username = %s
           AND password = %s
-    """, (username, password))
+    """, (
+        username,
+        password
+    ))
 
     user = cursor.fetchone()
 
     if user:
 
         return jsonify({
+
             "success": True,
-            "message": "Login successful",
+
+            "message":
+                "Login successful",
+
             "user": user
+
         })
 
     return jsonify({
+
         "success": False,
-        "message": "Invalid username or password"
+
+        "message":
+            "Invalid username or password"
+
     }), 401
 
 
@@ -450,14 +565,21 @@ def login():
 # UPLOAD CSV
 # ============================================================
 
-@app.route("/upload", methods=["POST"])
+@app.route(
+    "/upload",
+    methods=["POST"]
+)
 def upload():
 
     if "file" not in request.files:
 
         return jsonify({
+
             "success": False,
-            "message": "No file uploaded"
+
+            "message":
+                "No file uploaded"
+
         }), 400
 
     file = request.files["file"]
@@ -465,8 +587,12 @@ def upload():
     if file.filename == "":
 
         return jsonify({
+
             "success": False,
-            "message": "No file selected"
+
+            "message":
+                "No file selected"
+
         }), 400
 
     file_path = os.path.join(
@@ -478,9 +604,10 @@ def upload():
 
     try:
 
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(
+            file_path
+        )
 
-        # Replace NaN values with None
         df = df.where(
             pd.notnull(df),
             None
@@ -488,7 +615,9 @@ def upload():
 
         cursor = get_cursor()
 
-        columns = list(df.columns)
+        columns = list(
+            df.columns
+        )
 
         column_names = ", ".join(
             f"`{column}`"
@@ -517,33 +646,68 @@ def upload():
                 values
             )
 
-        get_cursor().connection.commit()
+        cursor.connection.commit()
 
         return jsonify({
+
             "success": True,
-            "message": "File uploaded successfully",
-            "records_added": len(df)
+
+            "message":
+                "File uploaded successfully",
+
+            "records_added":
+                len(df)
+
         })
 
     except Exception as e:
 
         return jsonify({
+
             "success": False,
+
             "message": str(e)
+
         }), 500
+
+
+# ============================================================
+# SEARCH BY COORDINATES
+# ============================================================
+
 @app.route("/search/data")
 def search_data():
-    lat = request.args.get("lat", type=float)
-    lon = request.args.get("lon", type=float)
-    radius = request.args.get("radius", type=float, default=10)
+
+    lat = request.args.get(
+        "lat",
+        type=float
+    )
+
+    lon = request.args.get(
+        "lon",
+        type=float
+    )
+
+    radius = request.args.get(
+        "radius",
+        type=float,
+        default=10
+    )
 
     if lat is None or lon is None:
+
         return jsonify({
+
             "success": False,
-            "message": "Latitude and longitude are required"
+
+            "message":
+                "Latitude and longitude are required"
+
         }), 400
 
-    cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(
+        dictionary=True
+    )
 
     query = """
         SELECT *,
@@ -551,23 +715,237 @@ def search_data():
             6371 * ACOS(
                 COS(RADIANS(%s))
                 * COS(RADIANS(latitude))
-                * COS(RADIANS(longitude) - RADIANS(%s))
+                * COS(
+                    RADIANS(longitude)
+                    - RADIANS(%s)
+                )
                 + SIN(RADIANS(%s))
                 * SIN(RADIANS(latitude))
             )
         ) AS distance_km
+
         FROM fish_data
+
         WHERE latitude IS NOT NULL
           AND longitude IS NOT NULL
+
         HAVING distance_km <= %s
+
         ORDER BY distance_km ASC
     """
 
-    cursor.execute(query, (lat, lon, lat, radius))
+    cursor.execute(
+        query,
+        (
+            lat,
+            lon,
+            lat,
+            radius
+        )
+    )
 
     rows = cursor.fetchall()
 
     return jsonify(rows)
+
+
+# ============================================================
+# CAPTURE & ANALYZE FISH
+# ============================================================
+
+@app.route(
+    "/analyze-fish",
+    methods=["POST"]
+)
+def analyze_fish():
+
+    # Check model
+    if model is None:
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                "Fish model is not loaded"
+
+        }), 500
+
+    # Check labels
+    if not class_names:
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                "Fish labels are not loaded"
+
+        }), 500
+
+    # Check image
+    if "image" not in request.files:
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                "No image uploaded"
+
+        }), 400
+
+    file = request.files["image"]
+
+    if file.filename == "":
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                "No image selected"
+
+        }), 400
+
+    try:
+
+        # ----------------------------------------------------
+        # Open image
+        # ----------------------------------------------------
+
+        image = Image.open(
+            file.stream
+        ).convert("RGB")
+
+        # ----------------------------------------------------
+        # Resize
+        # ----------------------------------------------------
+
+        image = image.resize(
+            (224, 224)
+        )
+
+        # ----------------------------------------------------
+        # Convert to NumPy
+        # ----------------------------------------------------
+
+        image_array = np.array(
+            image,
+            dtype=np.float32
+        )
+
+        # Add batch dimension
+        image_array = np.expand_dims(
+            image_array,
+            axis=0
+        )
+
+        # ----------------------------------------------------
+        # Prediction
+        # ----------------------------------------------------
+
+        predictions = model.predict(
+            image_array,
+            verbose=0
+        )
+
+        predicted_index = int(
+            np.argmax(
+                predictions[0]
+            )
+        )
+
+        confidence = float(
+            predictions[0][
+                predicted_index
+            ]
+        )
+
+        # ----------------------------------------------------
+        # Get predicted fish name
+        # ----------------------------------------------------
+
+        if predicted_index >= len(
+            class_names
+        ):
+
+            return jsonify({
+
+                "success": False,
+
+                "message":
+                    "Predicted class does not match labels"
+
+            }), 500
+
+        prediction = class_names[
+            predicted_index
+        ]
+
+        # ----------------------------------------------------
+        # Get environmental data
+        # ----------------------------------------------------
+
+        cursor = get_cursor(
+            dictionary=True
+        )
+
+        cursor.execute("""
+            SELECT
+                location,
+                latitude,
+                longitude,
+                depth_m,
+                temperature_c
+            FROM fish_data
+            WHERE LOWER(fish_name)
+                  = LOWER(%s)
+            LIMIT 1
+        """, (
+            prediction,
+        ))
+
+        details = cursor.fetchone()
+
+        # ----------------------------------------------------
+        # Response
+        # ----------------------------------------------------
+
+        return jsonify({
+
+            "success": True,
+
+            "prediction":
+                prediction,
+
+            "confidence":
+                round(
+                    confidence * 100,
+                    2
+                ),
+
+            "details":
+                details
+
+        })
+
+    except Exception as e:
+
+        print(
+            "ANALYZE FISH ERROR:",
+            str(e)
+        )
+
+        return jsonify({
+
+            "success": False,
+
+            "message":
+                str(e)
+
+        }), 500
+
 
 # ============================================================
 # RUN APPLICATION
@@ -580,5 +958,3 @@ if __name__ == "__main__":
         port=5000,
         debug=True
     )
-
-
