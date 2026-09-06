@@ -1,0 +1,33 @@
+# React
+node_modules/
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+backend/venv/
+venv/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Flask
+backend/__pycache__/
+
+
+# Uploaded/generated files
+backend/uploads/
+backend/cleaned/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

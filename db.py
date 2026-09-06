@@ -1,36 +1,27 @@
 import os
 import mysql.connector
+from flask import g
 
-db = None
 
-
-def get_connection():
-    global db
-
-    if db is None:
-        db = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            port=int(os.getenv("DB_PORT", "3306")),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME"),
-            ssl_disabled=False
+def get_db():
+    if "db" not in g:
+        g.db = mysql.connector.connect(
+            host=os.getenv("MYSQL_HOST"),
+            port=int(os.getenv("MYSQL_PORT", "3306")),
+            user=os.getenv("MYSQL_USER"),
+            password=os.getenv("MYSQL_PASSWORD"),
+            database=os.getenv("MYSQL_DATABASE"),
         )
-    else:
-        try:
-            db.ping(reconnect=True, attempts=3, delay=2)
-        except mysql.connector.Error:
-            db = mysql.connector.connect(
-                host=os.getenv("DB_HOST"),
-                port=int(os.getenv("DB_PORT", "3306")),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                database=os.getenv("DB_NAME"),
-                ssl_disabled=False
-            )
 
-    return db
+    return g.db
 
 
 def get_cursor(dictionary=False):
-    return get_connection().cursor(dictionary=dictionary)
+    return get_db().cursor(dictionary=dictionary)
+
+
+def close_db(exception=None):
+    db = g.pop("db", None)
+
+    if db is not None and db.is_connected():
+        db.close()

@@ -1,381 +1,548 @@
+
 import os
+import random
 import pandas as pd
 
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
-from db import get_cursor
+from db import get_cursor, close_db
 
+
+# ============================================================
+# FLASK APP
+# ============================================================
 
 app = Flask(__name__)
 CORS(app)
 
+# Close database connection automatically after each request
+app.teardown_appcontext(close_db)
 
-# --------------------------------------------------
+
+# ============================================================
+# FOLDERS
+# ============================================================
+
+UPLOAD_FOLDER = "uploads"
+CLEAN_FOLDER = "cleaned"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(CLEAN_FOLDER, exist_ok=True)
+
+
+# ============================================================
 # HOME / HEALTH CHECK
-# --------------------------------------------------
+# ============================================================
 
 @app.route("/")
 def home():
     return jsonify({
-        "status": "success",
-        "message": "Fish Catch Backend is running"
+        "message": "Fish Catch Repository API is running",
+        "status": "success"
     })
 
 
-# --------------------------------------------------
+# ============================================================
 # DASHBOARD
-# --------------------------------------------------
+# ============================================================
 
-@app.route("/dashboard", methods=["GET"])
+@app.route("/dashboard")
 def dashboard():
-    cursor = None
 
-    try:
-        cursor = get_cursor(dictionary=True)
+    cursor = get_cursor(dictionary=True)
 
-        # Total records
-        cursor.execute("""
-            SELECT COUNT(*) AS total
-            FROM fish_data
-        """)
-        total_records = cursor.fetchone()["total"]
+    # --------------------------------------------------------
+    # Total records
+    # --------------------------------------------------------
 
-        # Total different fish
-        cursor.execute("""
-            SELECT COUNT(DISTINCT fish_name) AS total_species
-            FROM fish_data
-        """)
-        total_species = cursor.fetchone()["total_species"]
+    cursor.execute("""
+        SELECT COUNT(*) AS total_records
+        FROM fish_data
+    """)
 
-        # Total different locations
-        cursor.execute("""
-            SELECT COUNT(DISTINCT location) AS total_locations
-            FROM fish_data
-        """)
-        total_locations = cursor.fetchone()["total_locations"]
+    total = cursor.fetchone()
 
-        # Fish distribution
-        cursor.execute("""
-            SELECT
-                fish_name,
-                COUNT(*) AS count
-            FROM fish_data
-            GROUP BY fish_name
-            ORDER BY count DESC
-        """)
-        species_data = cursor.fetchall()
+    # --------------------------------------------------------
+    # Fish species counts
+    # --------------------------------------------------------
 
-        # Location distribution
-        cursor.execute("""
-            SELECT
-                location,
-                COUNT(*) AS count
-            FROM fish_data
-            GROUP BY location
-            ORDER BY count DESC
-        """)
-        location_data = cursor.fetchall()
+    cursor.execute("""
+        SELECT fish_name, COUNT(*) AS count
+        FROM fish_data
+        GROUP BY fish_name
+        ORDER BY count DESC
+    """)
 
-        # All fish data
-        cursor.execute("""
-            SELECT *
-            FROM fish_data
-            LIMIT 100
-        """)
-        data = cursor.fetchall()
+    species = cursor.fetchall()
 
-        return jsonify({
-            "total_records": total_records,
-            "total_species": total_species,
-            "total_locations": total_locations,
-            "species_data": species_data,
-            "location_data": location_data,
-            "data": data
-        })
+    # --------------------------------------------------------
+    # Location counts
+    # --------------------------------------------------------
 
-    except Exception as e:
-        print("Dashboard error:", e)
+    cursor.execute("""
+        SELECT location, COUNT(*) AS count
+        FROM fish_data
+        GROUP BY location
+        ORDER BY count DESC
+    """)
 
-        return jsonify({
-            "error": str(e)
-        }), 500
+    locations = cursor.fetchall()
 
-    finally:
-        if cursor:
-            cursor.close()
+    return jsonify({
+        "total_records": total["total_records"],
+        "species_data": species,
+        "location_data": locations
+    })
 
 
-# --------------------------------------------------
-# RECOMMENDATION
-# --------------------------------------------------
+# ============================================================
+# SEARCH FISH DATA
+# ============================================================
 
-@app.route("/recommend", methods=["GET", "POST"])
-def recommend():
-    cursor = None
+@app.route("/search")
+def search():
 
-    try:
-        cursor = get_cursor(dictionary=True)
+    search_term = request.args.get("search", "").strip()
 
-        if request.method == "POST":
-            data = request.get_json() or {}
-            fish_name = data.get("fish_name") or data.get("species")
+    cursor = get_cursor(dictionary=True)
 
-            if fish_name:
-                cursor.execute("""
-                    SELECT *
-                    FROM fish_data
-                    WHERE fish_name = %s
-                """, (fish_name,))
-            else:
-                cursor.execute("""
-                    SELECT *
-                    FROM fish_data
-                    LIMIT 100
-                """)
+    if search_term:
 
-        else:
-            fish_name = (
-                request.args.get("fish_name")
-                or request.args.get("species")
-            )
-
-            if fish_name:
-                cursor.execute("""
-                    SELECT *
-                    FROM fish_data
-                    WHERE fish_name = %s
-                """, (fish_name,))
-            else:
-                cursor.execute("""
-                    SELECT *
-                    FROM fish_data
-                    LIMIT 100
-                """)
-
-        results = cursor.fetchall()
-
-        return jsonify(results)
-
-    except Exception as e:
-        print("Recommendation error:", e)
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-    finally:
-        if cursor:
-            cursor.close()
-
-
-# --------------------------------------------------
-# TREND
-# --------------------------------------------------
-
-@app.route("/trend", methods=["GET"])
-def trend():
-    cursor = None
-
-    try:
-        cursor = get_cursor(dictionary=True)
-
-        cursor.execute("""
-            SELECT
-                id,
-                fish_name,
-                location,
-                latitude,
-                longitude,
-                depth,
-                temperature,
-                date
-            FROM fish_data
-            ORDER BY date
-        """)
-
-        data = cursor.fetchall()
-
-        return jsonify(data)
-
-    except Exception as e:
-        print("Trend error:", e)
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-    finally:
-        if cursor:
-            cursor.close()
-
-
-# --------------------------------------------------
-# ANALYZE FISH
-# --------------------------------------------------
-
-@app.route("/analyze-fish", methods=["POST"])
-def analyze_fish():
-    try:
-        if "file" not in request.files:
-            return jsonify({
-                "error": "No file uploaded"
-            }), 400
-
-        file = request.files["file"]
-
-        if file.filename == "":
-            return jsonify({
-                "error": "No file selected"
-            }), 400
-
-        df = pd.read_csv(file)
-
-        df = df.where(pd.notnull(df), None)
-
-        return jsonify({
-            "success": True,
-            "columns": list(df.columns),
-            "rows": df.to_dict(orient="records")
-        })
-
-    except Exception as e:
-        print("Analyze fish error:", e)
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-
-# --------------------------------------------------
-# SEARCH FISH
-# --------------------------------------------------
-
-@app.route("/search/fish", methods=["GET"])
-def search_fish():
-    cursor = None
-
-    try:
-        fish_name = request.args.get("fish", "").strip()
-
-        cursor = get_cursor(dictionary=True)
-
-        if not fish_name:
-            return jsonify({
-                "error": "Please provide fish name"
-            }), 400
-
-        cursor.execute("""
+        query = """
             SELECT *
             FROM fish_data
             WHERE fish_name LIKE %s
-        """, (f"%{fish_name}%",))
+               OR location LIKE %s
+        """
 
-        results = cursor.fetchall()
+        search_value = f"%{search_term}%"
 
-        return jsonify(results)
+        cursor.execute(
+            query,
+            (search_value, search_value)
+        )
 
-    except Exception as e:
-        print("Fish search error:", e)
-        return jsonify({
-            "error": str(e)
-        }), 500
-
-    finally:
-        if cursor:
-            cursor.close()
-
-
-# --------------------------------------------------
-# SEARCH LOCATION
-# --------------------------------------------------
-
-@app.route("/search/location", methods=["GET"])
-def search_location():
-    cursor = None
-
-    try:
-        location = request.args.get("location", "").strip()
-
-        cursor = get_cursor(dictionary=True)
-
-        if not location:
-            return jsonify({
-                "error": "Please provide location"
-            }), 400
+    else:
 
         cursor.execute("""
             SELECT *
             FROM fish_data
-            WHERE location LIKE %s
-        """, (f"%{location}%",))
+        """)
 
-        results = cursor.fetchall()
+    rows = cursor.fetchall()
 
-        return jsonify(results)
+    return jsonify(rows)
 
-    except Exception as e:
-        print("Location search error:", e)
+
+# ============================================================
+# RECOMMENDATION
+# ============================================================
+
+@app.route("/recommend")
+def recommend():
+
+    location = request.args.get("location")
+    month = request.args.get("month")
+
+    cursor = get_cursor(dictionary=True)
+
+    # --------------------------------------------------------
+    # If both filters are provided
+    # --------------------------------------------------------
+
+    if location and month:
+
+        query = """
+            SELECT fish_name,
+                   location,
+                   temperature_c,
+                   depth_m
+            FROM fish_data
+            WHERE location = %s
+              AND MONTH(date) = %s
+        """
+
+        cursor.execute(
+            query,
+            (location, month)
+        )
+
+    # --------------------------------------------------------
+    # Only location
+    # --------------------------------------------------------
+
+    elif location:
+
+        query = """
+            SELECT fish_name,
+                   location,
+                   temperature_c,
+                   depth_m
+            FROM fish_data
+            WHERE location = %s
+        """
+
+        cursor.execute(
+            query,
+            (location,)
+        )
+
+    # --------------------------------------------------------
+    # Only month
+    # --------------------------------------------------------
+
+    elif month:
+
+        query = """
+            SELECT fish_name,
+                   location,
+                   temperature_c,
+                   depth_m
+            FROM fish_data
+            WHERE MONTH(date) = %s
+        """
+
+        cursor.execute(
+            query,
+            (month,)
+        )
+
+    # --------------------------------------------------------
+    # No filters
+    # --------------------------------------------------------
+
+    else:
+
+        cursor.execute("""
+            SELECT fish_name,
+                   location,
+                   temperature_c,
+                   depth_m
+            FROM fish_data
+        """)
+
+    rows = cursor.fetchall()
+
+    return jsonify(rows)
+
+
+# ============================================================
+# TREND
+# ============================================================
+
+@app.route("/trend")
+def trend():
+
+    cursor = get_cursor()
+
+    cursor.execute("""
+        SELECT YEAR(date) AS year,
+               COUNT(*) AS count
+        FROM fish_data
+        GROUP BY YEAR(date)
+        ORDER BY YEAR(date)
+    """)
+
+    rows = cursor.fetchall()
+
+    data = []
+
+    for row in rows:
+
+        data.append({
+            "year": row[0],
+            "count": row[1]
+        })
+
+    return jsonify(data)
+
+
+# ============================================================
+# GET ALL FISH DATA
+# ============================================================
+
+@app.route("/fish-data")
+def fish_data():
+
+    cursor = get_cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM fish_data
+        ORDER BY date DESC
+    """)
+
+    rows = cursor.fetchall()
+
+    return jsonify(rows)
+
+
+# ============================================================
+# GET UNIQUE LOCATIONS
+# ============================================================
+
+@app.route("/locations")
+def locations():
+
+    cursor = get_cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT location
+        FROM fish_data
+        WHERE location IS NOT NULL
+          AND location != ''
+        ORDER BY location
+    """)
+
+    rows = cursor.fetchall()
+
+    locations_list = [
+        row[0]
+        for row in rows
+    ]
+
+    return jsonify(locations_list)
+
+
+# ============================================================
+# GET UNIQUE FISH SPECIES
+# ============================================================
+
+@app.route("/species")
+def species():
+
+    cursor = get_cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT fish_name
+        FROM fish_data
+        WHERE fish_name IS NOT NULL
+          AND fish_name != ''
+        ORDER BY fish_name
+    """)
+
+    rows = cursor.fetchall()
+
+    species_list = [
+        row[0]
+        for row in rows
+    ]
+
+    return jsonify(species_list)
+
+
+# ============================================================
+# DOWNLOAD FISH DATA AS CSV
+# ============================================================
+
+@app.route("/download/csv")
+def download_csv():
+
+    cursor = get_cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM fish_data
+    """)
+
+    rows = cursor.fetchall()
+
+    df = pd.DataFrame(rows)
+
+    file_path = os.path.join(
+        CLEAN_FOLDER,
+        "fish_data.csv"
+    )
+
+    df.to_csv(
+        file_path,
+        index=False
+    )
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name="fish_data.csv"
+    )
+
+
+# ============================================================
+# DOWNLOAD FISH DATA AS EXCEL
+# ============================================================
+
+@app.route("/download/excel")
+def download_excel():
+
+    cursor = get_cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM fish_data
+    """)
+
+    rows = cursor.fetchall()
+
+    df = pd.DataFrame(rows)
+
+    file_path = os.path.join(
+        CLEAN_FOLDER,
+        "fish_data.xlsx"
+    )
+
+    df.to_excel(
+        file_path,
+        index=False
+    )
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name="fish_data.xlsx"
+    )
+
+
+# ============================================================
+# ADMIN LOGIN
+# ============================================================
+
+@app.route("/login", methods=["POST"])
+def login():
+
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+
         return jsonify({
-            "error": str(e)
-        }), 500
+            "success": False,
+            "message": "Username and password are required"
+        }), 400
 
-    finally:
-        if cursor:
-            cursor.close()
+    cursor = get_cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM users
+        WHERE username = %s
+          AND password = %s
+    """, (username, password))
+
+    user = cursor.fetchone()
+
+    if user:
+
+        return jsonify({
+            "success": True,
+            "message": "Login successful",
+            "user": user
+        })
+
+    return jsonify({
+        "success": False,
+        "message": "Invalid username or password"
+    }), 401
 
 
-# --------------------------------------------------
-# SEARCH DATA
-# --------------------------------------------------
+# ============================================================
+# UPLOAD CSV
+# ============================================================
 
-@app.route("/search/data", methods=["GET"])
-def search_data():
-    cursor = None
+@app.route("/upload", methods=["POST"])
+def upload():
+
+    if "file" not in request.files:
+
+        return jsonify({
+            "success": False,
+            "message": "No file uploaded"
+        }), 400
+
+    file = request.files["file"]
+
+    if file.filename == "":
+
+        return jsonify({
+            "success": False,
+            "message": "No file selected"
+        }), 400
+
+    file_path = os.path.join(
+        UPLOAD_FOLDER,
+        file.filename
+    )
+
+    file.save(file_path)
 
     try:
-        search = request.args.get("search", "").strip()
 
-        cursor = get_cursor(dictionary=True)
+        df = pd.read_csv(file_path)
 
-        if not search:
-            cursor.execute("""
-                SELECT *
-                FROM fish_data
-                LIMIT 100
-            """)
-        else:
-            cursor.execute("""
-                SELECT *
-                FROM fish_data
-                WHERE fish_name LIKE %s
-                   OR location LIKE %s
-            """, (
-                f"%{search}%",
-                f"%{search}%"
-            ))
+        # Replace NaN values with None
+        df = df.where(
+            pd.notnull(df),
+            None
+        )
 
-        results = cursor.fetchall()
+        cursor = get_cursor()
 
-        return jsonify(results)
+        columns = list(df.columns)
+
+        column_names = ", ".join(
+            f"`{column}`"
+            for column in columns
+        )
+
+        placeholders = ", ".join(
+            ["%s"] * len(columns)
+        )
+
+        query = f"""
+            INSERT INTO fish_data
+            ({column_names})
+            VALUES ({placeholders})
+        """
+
+        for _, row in df.iterrows():
+
+            values = tuple(
+                row[column]
+                for column in columns
+            )
+
+            cursor.execute(
+                query,
+                values
+            )
+
+        get_cursor().connection.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "File uploaded successfully",
+            "records_added": len(df)
+        })
 
     except Exception as e:
-        print("Data search error:", e)
+
         return jsonify({
-            "error": str(e)
+            "success": False,
+            "message": str(e)
         }), 500
 
-    finally:
-        if cursor:
-            cursor.close()
 
-
-# --------------------------------------------------
+# ============================================================
 # RUN APPLICATION
-# --------------------------------------------------
+# ============================================================
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
 
     app.run(
         host="0.0.0.0",
-        port=port,
-        debug=False
+        port=5000,
+        debug=True
     )
+
+
