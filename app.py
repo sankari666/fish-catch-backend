@@ -531,7 +531,43 @@ def upload():
             "success": False,
             "message": str(e)
         }), 500
+@app.route("/search/data")
+def search_data():
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    radius = request.args.get("radius", type=float, default=10)
 
+    if lat is None or lon is None:
+        return jsonify({
+            "success": False,
+            "message": "Latitude and longitude are required"
+        }), 400
+
+    cursor = get_cursor(dictionary=True)
+
+    query = """
+        SELECT *,
+        (
+            6371 * ACOS(
+                COS(RADIANS(%s))
+                * COS(RADIANS(latitude))
+                * COS(RADIANS(longitude) - RADIANS(%s))
+                + SIN(RADIANS(%s))
+                * SIN(RADIANS(latitude))
+            )
+        ) AS distance_km
+        FROM fish_data
+        WHERE latitude IS NOT NULL
+          AND longitude IS NOT NULL
+        HAVING distance_km <= %s
+        ORDER BY distance_km ASC
+    """
+
+    cursor.execute(query, (lat, lon, lat, radius))
+
+    rows = cursor.fetchall()
+
+    return jsonify(rows)
 
 # ============================================================
 # RUN APPLICATION
